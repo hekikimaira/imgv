@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>ImageDeck</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+  :root {
+    --bg-primary: #0a0a0c;
+    --bg-secondary: #111115;
+    --bg-tertiary: #18181d;
+    --bg-hover: #1f1f26;
+    --bg-active: #252530;
+    --border: #2a2a35;
+    --text-primary: #e8e8ed;
+    --text-secondary: #8888a0;
+    --text-muted: #555568;
+    --accent: #6c8aff;
+    --accent-dim: #4a62c0;
+    --accent-bg: rgba(108,138,255,0.08);
+    --danger: #ff6b6b;
+    --success: #5ce0a0;
+    --sidebar-width: 280px;
+    --toolbar-height: 48px;
+    --radius: 8px;
+    --radius-sm: 5px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    font-family: 'DM Sans', -apple-system, sans-serif;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    height: 100dvh;
+    overflow: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  /* ===== LAYOUT ===== */
+  .app {
+    display: flex;
+    height: 100dvh;
+  }
+
+  /* ===== SIDEBAR ===== */
+  .sidebar {
+    width: var(--sidebar-width);
+    min-width: var(--sidebar-width);
+    background: var(--bg-secondary);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    z-index: 10;
+  }
+
+  .sidebar-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .sidebar-header h1 {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+  }
+
+  .sidebar-header h1 span {
+    color: var(--accent);
+  }
+
+  .sidebar-actions {
+    display: flex;
+    gap: 4px;
+  }
+
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 18px;
+  }
+
+  .icon-btn:hover, .icon-btn:active { background: var(--bg-hover); color: var(--text-primary); }
+
+  .folder-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .folder-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.12s;
+    gap: 10px;
+    position: relative;
+  }
+
+  .folder-item:active, .folder-item:hover { background: var(--bg-hover); }
+  .folder-item.active { background: var(--accent-bg); color: var(--accent); }
+  .folder-item.active .folder-icon { color: var(--accent); }
+
+  .folder-icon {
+    font-size: 18px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    width: 22px;
+    text-align: center;
+  }
+
+  .folder-item.active .folder-icon { color: var(--accent); }
+
+  .folder-name {
+    font-size: 13px;
+    font-weight: 500;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .folder-count {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    background: var(--bg-tertiary);
+    padding: 2px 7px;
+    border-radius: 10px;
+    min-width: 22px;
+    text-align: center;
+  }
+
+  .folder-item.active .folder-count { background: rgba(108,138,255,0.15); color: var(--accent-dim); }
+
+  .folder-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 12px;
+  }
+
+  .drop-target { outline: 2px dashed var(--accent); outline-offset: -2px; background: var(--accent-bg) !important; }
+
+  /* ===== MAIN CONTENT ===== */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .toolbar {
+    height: var(--toolbar-height);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    padding: 0 12px;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .toolbar-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
+  .toolbar-right { display: flex; align-items: center; gap: 4px; }
+
+  .current-folder-name {
+    font-size: 14px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .file-count-badge {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-muted);
+    flex-shrink: 0;
+  }
+
+  .size-switch {
+    display: flex;
+    background: var(--bg-tertiary);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    border: 1px solid var(--border);
+  }
+
+  .size-btn {
+    padding: 6px 10px;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .size-btn.active { background: var(--accent); color: #fff; }
+
+  .import-btn {
+    padding: 6px 14px;
+    border: 1px solid var(--accent-dim);
+    background: transparent;
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .import-btn:active { background: var(--accent); color: #fff; }
+
+  /* ===== GRID ===== */
+  .grid-container {
+    flex: 1;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 12px;
+  }
+
+  .image-grid {
+    display: grid;
+    gap: 8px;
+  }
+
+  .image-grid[data-size="S"] { grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); }
+  .image-grid[data-size="M"] { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+  .image-grid[data-size="L"] { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+
+  .grid-item {
+    position: relative;
+    aspect-ratio: 1;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    cursor: pointer;
+    background: var(--bg-tertiary);
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .grid-item:active { transform: scale(0.96); }
+  .grid-item.selected { outline: 3px solid var(--accent); outline-offset: -3px; }
+
+  .grid-item img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    pointer-events: none;
+  }
+
+  .grid-item .filename-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 4px 6px;
+    background: linear-gradient(transparent, rgba(0,0,0,0.7));
+    font-size: 10px;
+    color: rgba(255,255,255,0.8);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+  }
+
+  .image-grid[data-size="L"] .filename-overlay { opacity: 1; }
+
+  .select-check {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.5);
+    background: rgba(0,0,0,0.3);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    font-size: 14px;
+    transition: all 0.12s;
+  }
+
+  .select-mode .select-check { display: flex; }
+  .grid-item.selected .select-check { background: var(--accent); border-color: var(--accent); }
+
+  /* ===== EMPTY STATE ===== */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    gap: 12px;
+    padding: 40px;
+    text-align: center;
+  }
+
+  .empty-state .empty-icon { font-size: 48px; opacity: 0.4; }
+  .empty-state p { font-size: 14px; line-height: 1.6; }
+
+  .empty-state .hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    opacity: 0.6;
+  }
+
+  /* ===== VIEWER ===== */
+  .viewer {
+    position: fixed;
+    inset: 0;
+    background: #000;
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    touch-action: none;
+  }
+
+  .viewer.active { display: flex; }
+
+  .viewer img {
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    transition: transform 0.2s ease-out, opacity 0.2s;
+  }
+
+  .viewer-info {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    padding: 16px 20px;
+    padding-bottom: max(16px, env(safe-area-inset-bottom));
+    background: linear-gradient(transparent, rgba(0,0,0,0.6));
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .viewer.show-info .viewer-info { opacity: 1; }
+
+  .viewer-filename { font-size: 13px; color: rgba(255,255,255,0.8); }
+  .viewer-counter { font-size: 12px; font-family: 'JetBrains Mono', monospace; color: rgba(255,255,255,0.5); }
+
+  .swipe-hint {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 11px;
+    color: rgba(255,255,255,0.3);
+    pointer-events: none;
+    opacity: 0;
+    animation: hintFade 3s ease 1s forwards;
+  }
+
+  .swipe-hint.left { left: 16px; }
+  .swipe-hint.right { right: 16px; }
+  .swipe-hint.top { top: 20px; left: 50%; transform: translateX(-50%); }
+
+  @keyframes hintFade {
+    0% { opacity: 0; }
+    20% { opacity: 1; }
+    80% { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* ===== MODAL ===== */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 200;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 340px;
+    overflow: hidden;
+  }
+
+  .modal-header {
+    padding: 18px 20px 12px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .modal-body { padding: 0 20px 18px; }
+
+  .modal-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'DM Sans', sans-serif;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .modal-input:focus { border-color: var(--accent); }
+
+  .modal-footer {
+    display: flex;
+    border-top: 1px solid var(--border);
+  }
+
+  .modal-btn {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    font-size: 15px;
+    font-weight: 500;
+    font-family: 'DM Sans', sans-serif;
+    cursor: pointer;
+    transition: background 0.12s;
+  }
+
+  .modal-btn:active { background: var(--bg-hover); }
+  .modal-btn.primary { color: var(--accent); font-weight: 600; }
+  .modal-btn.danger { color: var(--danger); }
+  .modal-btn + .modal-btn { border-left: 1px solid var(--border); }
+
+  /* ===== CONTEXT MENU ===== */
+  .context-menu {
+    position: fixed;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 6px;
+    z-index: 150;
+    display: none;
+    min-width: 180px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+
+  .context-menu.active { display: block; }
+
+  .ctx-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .ctx-item:active { background: var(--bg-hover); }
+  .ctx-item .ctx-icon { width: 20px; text-align: center; font-size: 16px; }
+  .ctx-item.danger { color: var(--danger); }
+  .ctx-divider { height: 1px; background: var(--border); margin: 4px 8px; }
+
+  /* ===== SELECT MODE BAR ===== */
+  .select-bar {
+    height: var(--toolbar-height);
+    background: var(--accent);
+    display: none;
+    align-items: center;
+    padding: 0 12px;
+    gap: 12px;
+    flex-shrink: 0;
+  }
+
+  .select-bar.active { display: flex; }
+  .select-bar.active + .toolbar { display: none; }
+
+  .select-bar .select-count {
+    font-size: 14px;
+    font-weight: 600;
+    color: #fff;
+    flex: 1;
+  }
+
+  .select-bar button {
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.3);
+    background: transparent;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: 'DM Sans', sans-serif;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+
+  .select-bar button:active { background: rgba(255,255,255,0.2); }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed;
+    bottom: max(20px, env(safe-area-inset-bottom));
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 10px 20px;
+    border-radius: 24px;
+    font-size: 13px;
+    font-weight: 500;
+    z-index: 300;
+    transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* ===== SCROLLBAR ===== */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ===== DROP ZONE ===== */
+  .drop-zone-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(108,138,255,0.08);
+    border: 3px dashed var(--accent);
+    z-index: 50;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .drop-zone-overlay.active { display: flex; }
+  .drop-zone-overlay span { font-size: 18px; font-weight: 600; color: var(--accent); }
+
+  /* ===== MOVE MODAL ===== */
+  .move-folder-list {
+    max-height: 240px;
+    overflow-y: auto;
+    margin-top: 8px;
+  }
+
+  .move-folder-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: background 0.12s;
+    font-size: 14px;
+  }
+
+  .move-folder-item:active { background: var(--bg-hover); }
+  .move-folder-item .mf-icon { font-size: 18px; }
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <!-- SIDEBAR -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <h1>Image<span>Deck</span></h1>
+      <div class="sidebar-actions">
+        <button class="icon-btn" onclick="showNewFolderModal()" title="新規フォルダ">＋</button>
+      </div>
+    </div>
+    <div class="folder-list" id="folderList"></div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="select-bar" id="selectBar">
+      <button onclick="exitSelectMode()">✕</button>
+      <span class="select-count" id="selectCount">0件選択</span>
+      <button onclick="showMoveModal()">移動</button>
+      <button onclick="deleteSelected()">削除</button>
+    </div>
+    <div class="toolbar" id="toolbar">
+      <div class="toolbar-left">
+        <span class="current-folder-name" id="currentFolderName">すべて</span>
+        <span class="file-count-badge" id="fileCount"></span>
+      </div>
+      <div class="toolbar-right">
+        <div class="size-switch" id="sizeSwitch">
+          <button class="size-btn" data-size="S" onclick="setGridSize('S')">S</button>
+          <button class="size-btn active" data-size="M" onclick="setGridSize('M')">M</button>
+          <button class="size-btn" data-size="L" onclick="setGridSize('L')">L</button>
+        </div>
+        <label class="import-btn" for="fileInput">＋追加</label>
+        <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="handleFileImport(event)">
+      </div>
+    </div>
+    <div class="grid-container" id="gridContainer">
+      <div class="image-grid" id="imageGrid" data-size="M"></div>
+    </div>
+  </div>
+</div>
+
+<!-- VIEWER -->
+<div class="viewer" id="viewer">
+  <img id="viewerImg" src="" alt="">
+  <div class="viewer-info">
+    <span class="viewer-filename" id="viewerFilename"></span>
+    <span class="viewer-counter" id="viewerCounter"></span>
+  </div>
+</div>
+
+<!-- MODAL: New Folder -->
+<div class="modal-overlay" id="newFolderModal">
+  <div class="modal">
+    <div class="modal-header">新規フォルダ</div>
+    <div class="modal-body">
+      <input class="modal-input" id="newFolderInput" placeholder="フォルダ名" autocomplete="off" autofocus>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn" onclick="closeModal('newFolderModal')">キャンセル</button>
+      <button class="modal-btn primary" onclick="createFolder()">作成</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Rename Folder -->
+<div class="modal-overlay" id="renameFolderModal">
+  <div class="modal">
+    <div class="modal-header">フォルダ名変更</div>
+    <div class="modal-body">
+      <input class="modal-input" id="renameFolderInput" placeholder="新しいフォルダ名" autocomplete="off">
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn" onclick="closeModal('renameFolderModal')">キャンセル</button>
+      <button class="modal-btn primary" onclick="renameFolder()">変更</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Move to Folder -->
+<div class="modal-overlay" id="moveFolderModal">
+  <div class="modal">
+    <div class="modal-header">移動先を選択</div>
+    <div class="modal-body">
+      <div class="move-folder-list" id="moveFolderList"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn" onclick="closeModal('moveFolderModal')">キャンセル</button>
+    </div>
+  </div>
+</div>
+
+<!-- CONTEXT MENU -->
+<div class="context-menu" id="contextMenu"></div>
+
+<!-- DROP OVERLAY -->
+<div class="drop-zone-overlay" id="dropOverlay"><span>ここにドロップ</span></div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ===== DATABASE =====
+const DB_NAME = 'ImageDeckDB';
+const DB_VERSION = 1;
+let db;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = (e) => {
+      const d = e.target.result;
+      if (!d.objectStoreNames.contains('images')) {
+        const store = d.createObjectStore('images', { keyPath: 'id' });
+        store.createIndex('folderId', 'folderId', { unique: false });
+        store.createIndex('addedAt', 'addedAt', { unique: false });
+      }
+      if (!d.objectStoreNames.contains('folders')) {
+        d.createObjectStore('folders', { keyPath: 'id' });
+      }
+    };
+    req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+    req.onerror = (e) => reject(e);
+  });
+}
+
+function dbTx(storeName, mode = 'readonly') {
+  return db.transaction(storeName, mode).objectStore(storeName);
+}
+
+function dbAll(storeName) {
+  return new Promise((resolve, reject) => {
+    const req = dbTx(storeName).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbPut(storeName, data) {
+  return new Promise((resolve, reject) => {
+    const req = dbTx(storeName, 'readwrite').put(data);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbDelete(storeName, key) {
+  return new Promise((resolve, reject) => {
+    const req = dbTx(storeName, 'readwrite').delete(key);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function dbGetByIndex(storeName, indexName, value) {
+  return new Promise((resolve, reject) => {
+    const req = dbTx(storeName).index(indexName).getAll(value);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+// ===== STATE =====
+let folders = [];
+let currentFolderId = '__all__';
+let currentImages = [];
+let selectedIds = new Set();
+let selectMode = false;
+let gridSize = 'M';
+let viewerIndex = -1;
+let viewerImages = [];
+
+// Viewer gesture state
+let swipeStartX = 0, swipeStartY = 0, swipeUpCount = 0, swipeUpTimer = null;
+
+// Folder context menu
+let contextFolderId = null;
+
+// ===== INIT =====
+async function init() {
+  await openDB();
+  await loadFolders();
+  await loadImages();
+  setupDragDrop();
+}
+
+// ===== FOLDERS =====
+async function loadFolders() {
+  folders = await dbAll('folders');
+  folders.sort((a, b) => a.createdAt - b.createdAt);
+  renderFolders();
+}
+
+function renderFolders() {
+  const list = document.getElementById('folderList');
+
+  // Count images per folder
+  const countMap = {};
+  let totalCount = 0;
+
+  // We'll count async, but for now use cached currentImages
+  // Actually let's just count from DB
+  const req = dbTx('images').getAll();
+  req.onsuccess = () => {
+    const allImages = req.result;
+    totalCount = allImages.length;
+    allImages.forEach(img => {
+      countMap[img.folderId] = (countMap[img.folderId] || 0) + 1;
+    });
+
+    let html = '';
+
+    // "All" virtual folder
+    html += `<div class="folder-item ${currentFolderId === '__all__' ? 'active' : ''}" 
+                  onclick="selectFolder('__all__')"
+                  data-folder-id="__all__">
+      <span class="folder-icon">◻</span>
+      <span class="folder-name">すべて</span>
+      <span class="folder-count">${totalCount}</span>
+    </div>`;
+
+    // "Unsorted" virtual folder
+    const unsortedCount = allImages.filter(i => !i.folderId || i.folderId === '__unsorted__').length;
+    html += `<div class="folder-item ${currentFolderId === '__unsorted__' ? 'active' : ''}" 
+                  onclick="selectFolder('__unsorted__')"
+                  data-folder-id="__unsorted__">
+      <span class="folder-icon">○</span>
+      <span class="folder-name">未分類</span>
+      <span class="folder-count">${unsortedCount}</span>
+    </div>`;
+
+    if (folders.length > 0) {
+      html += '<div class="folder-divider"></div>';
+    }
+
+    folders.forEach(f => {
+      html += `<div class="folder-item ${currentFolderId === f.id ? 'active' : ''}" 
+                    onclick="selectFolder('${f.id}')"
+                    oncontextmenu="showFolderContext(event, '${f.id}')"
+                    data-folder-id="${f.id}">
+        <span class="folder-icon">■</span>
+        <span class="folder-name">${escHtml(f.name)}</span>
+        <span class="folder-count">${countMap[f.id] || 0}</span>
+      </div>`;
+    });
+
+    list.innerHTML = html;
+
+    // Setup long press for folder context on touch
+    setupFolderLongPress();
+  };
+}
+
+function setupFolderLongPress() {
+  document.querySelectorAll('.folder-item[data-folder-id]').forEach(el => {
+    const fid = el.dataset.folderId;
+    if (fid === '__all__' || fid === '__unsorted__') return;
+    let timer;
+    el.addEventListener('touchstart', (e) => {
+      timer = setTimeout(() => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        showFolderContextAt(fid, touch.clientX, touch.clientY);
+      }, 500);
+    }, { passive: false });
+    el.addEventListener('touchend', () => clearTimeout(timer));
+    el.addEventListener('touchmove', () => clearTimeout(timer));
+  });
+}
+
+function showFolderContext(e, folderId) {
+  e.preventDefault();
+  showFolderContextAt(folderId, e.clientX, e.clientY);
+}
+
+function showFolderContextAt(folderId, x, y) {
+  contextFolderId = folderId;
+  const menu = document.getElementById('contextMenu');
+  menu.innerHTML = `
+    <div class="ctx-item" onclick="startRenameFolder()"><span class="ctx-icon">✎</span>名前を変更</div>
+    <div class="ctx-divider"></div>
+    <div class="ctx-item danger" onclick="confirmDeleteFolder()"><span class="ctx-icon">✕</span>フォルダを削除</div>
+  `;
+  menu.style.left = Math.min(x, window.innerWidth - 200) + 'px';
+  menu.style.top = Math.min(y, window.innerHeight - 120) + 'px';
+  menu.classList.add('active');
+  setTimeout(() => {
+    document.addEventListener('pointerdown', closeContextMenu, { once: true });
+  }, 10);
+}
+
+function closeContextMenu() {
+  document.getElementById('contextMenu').classList.remove('active');
+}
+
+function showNewFolderModal() {
+  document.getElementById('newFolderInput').value = '';
+  document.getElementById('newFolderModal').classList.add('active');
+  setTimeout(() => document.getElementById('newFolderInput').focus(), 100);
+}
+
+async function createFolder() {
+  const name = document.getElementById('newFolderInput').value.trim();
+  if (!name) return;
+  const folder = { id: 'f_' + Date.now(), name, createdAt: Date.now() };
+  await dbPut('folders', folder);
+  closeModal('newFolderModal');
+  await loadFolders();
+  toast(`「${name}」を作成`);
+}
+
+function startRenameFolder() {
+  closeContextMenu();
+  const f = folders.find(f => f.id === contextFolderId);
+  if (!f) return;
+  document.getElementById('renameFolderInput').value = f.name;
+  document.getElementById('renameFolderModal').classList.add('active');
+  setTimeout(() => document.getElementById('renameFolderInput').focus(), 100);
+}
+
+async function renameFolder() {
+  const name = document.getElementById('renameFolderInput').value.trim();
+  if (!name) return;
+  const f = folders.find(f => f.id === contextFolderId);
+  if (f) {
+    f.name = name;
+    await dbPut('folders', f);
+    closeModal('renameFolderModal');
+    await loadFolders();
+    if (currentFolderId === contextFolderId) {
+      document.getElementById('currentFolderName').textContent = name;
+    }
+    toast('名前を変更しました');
+  }
+}
+
+async function confirmDeleteFolder() {
+  closeContextMenu();
+  const f = folders.find(f => f.id === contextFolderId);
+  if (!f) return;
+  if (confirm(`「${f.name}」を削除しますか？\n中の画像は未分類に移動します。`)) {
+    // Move images to unsorted
+    const images = await dbGetByIndex('images', 'folderId', contextFolderId);
+    for (const img of images) {
+      img.folderId = '__unsorted__';
+      await dbPut('images', img);
+    }
+    await dbDelete('folders', contextFolderId);
+    if (currentFolderId === contextFolderId) currentFolderId = '__all__';
+    await loadFolders();
+    await loadImages();
+    toast('フォルダを削除しました');
+  }
+}
+
+async function selectFolder(folderId) {
+  currentFolderId = folderId;
+  exitSelectMode();
+  renderFolders();
+  await loadImages();
+}
+
+// ===== IMAGES =====
+async function loadImages() {
+  let images;
+  if (currentFolderId === '__all__') {
+    images = await dbAll('images');
+  } else if (currentFolderId === '__unsorted__') {
+    const all = await dbAll('images');
+    images = all.filter(i => !i.folderId || i.folderId === '__unsorted__');
+  } else {
+    images = await dbGetByIndex('images', 'folderId', currentFolderId);
+  }
+  images.sort((a, b) => b.addedAt - a.addedAt);
+  currentImages = images;
+  renderGrid();
+  updateToolbar();
+}
+
+function renderGrid() {
+  const grid = document.getElementById('imageGrid');
+  const container = document.getElementById('gridContainer');
+
+  if (currentImages.length === 0) {
+    grid.style.display = 'none';
+    if (!container.querySelector('.empty-state')) {
+      const empty = document.createElement('div');
+      empty.className = 'empty-state';
+      empty.innerHTML = `
+        <div class="empty-icon">◇</div>
+        <p>画像がありません</p>
+        <p class="hint">「＋追加」ボタンかドラッグ＆ドロップで<br>画像を追加してください</p>
+      `;
+      container.appendChild(empty);
+    }
+    return;
+  }
+
+  grid.style.display = 'grid';
+  const existing = container.querySelector('.empty-state');
+  if (existing) existing.remove();
+
+  grid.innerHTML = currentImages.map((img, i) => `
+    <div class="grid-item ${selectedIds.has(img.id) ? 'selected' : ''}" 
+         data-id="${img.id}" data-index="${i}"
+         onclick="handleGridClick(event, '${img.id}', ${i})"
+         oncontextmenu="handleGridContext(event, '${img.id}')">
+      <img src="${img.thumbnail || img.data}" alt="${escHtml(img.name)}" loading="lazy">
+      <div class="filename-overlay">${escHtml(img.name)}</div>
+      <div class="select-check">${selectedIds.has(img.id) ? '✓' : ''}</div>
+    </div>
+  `).join('');
+
+  // Setup long-press for grid items
+  setupGridLongPress();
+}
+
+function setupGridLongPress() {
+  document.querySelectorAll('.grid-item').forEach(el => {
+    let timer;
+    el.addEventListener('touchstart', (e) => {
+      timer = setTimeout(() => {
+        e.preventDefault();
+        if (!selectMode) enterSelectMode();
+        toggleSelect(el.dataset.id);
+      }, 400);
+    }, { passive: false });
+    el.addEventListener('touchend', () => clearTimeout(timer));
+    el.addEventListener('touchmove', () => clearTimeout(timer));
+  });
+}
+
+function handleGridClick(e, id, index) {
+  e.preventDefault();
+  if (selectMode) {
+    toggleSelect(id);
+  } else {
+    openViewer(index);
+  }
+}
+
+function handleGridContext(e, id) {
+  e.preventDefault();
+  if (!selectMode) enterSelectMode();
+  toggleSelect(id);
+}
+
+function updateToolbar() {
+  const name = currentFolderId === '__all__' ? 'すべて' :
+               currentFolderId === '__unsorted__' ? '未分類' :
+               (folders.find(f => f.id === currentFolderId)?.name || '');
+  document.getElementById('currentFolderName').textContent = name;
+  document.getElementById('fileCount').textContent = currentImages.length > 0 ? `${currentImages.length}枚` : '';
+}
+
+// ===== SELECT MODE =====
+function enterSelectMode() {
+  selectMode = true;
+  selectedIds.clear();
+  document.getElementById('imageGrid').classList.add('select-mode');
+  document.getElementById('selectBar').classList.add('active');
+  updateSelectCount();
+}
+
+function exitSelectMode() {
+  selectMode = false;
+  selectedIds.clear();
+  document.getElementById('imageGrid').classList.remove('select-mode');
+  document.getElementById('selectBar').classList.remove('active');
+  renderGrid();
+}
+
+function toggleSelect(id) {
+  if (selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateSelectCount();
+  renderGrid();
+}
+
+function updateSelectCount() {
+  document.getElementById('selectCount').textContent = `${selectedIds.size}件選択`;
+}
+
+async function deleteSelected() {
+  if (selectedIds.size === 0) return;
+  if (!confirm(`${selectedIds.size}件の画像を削除しますか？`)) return;
+  for (const id of selectedIds) {
+    await dbDelete('images', id);
+  }
+  toast(`${selectedIds.size}件削除しました`);
+  exitSelectMode();
+  await loadFolders();
+  await loadImages();
+}
+
+function showMoveModal() {
+  if (selectedIds.size === 0) return;
+  const list = document.getElementById('moveFolderList');
+  let html = `<div class="move-folder-item" onclick="moveSelectedTo('__unsorted__')">
+    <span class="mf-icon">○</span>未分類
+  </div>`;
+  folders.forEach(f => {
+    html += `<div class="move-folder-item" onclick="moveSelectedTo('${f.id}')">
+      <span class="mf-icon">■</span>${escHtml(f.name)}
+    </div>`;
+  });
+  list.innerHTML = html;
+  document.getElementById('moveFolderModal').classList.add('active');
+}
+
+async function moveSelectedTo(folderId) {
+  for (const id of selectedIds) {
+    const req = dbTx('images').get(id);
+    await new Promise((resolve) => {
+      req.onsuccess = async () => {
+        const img = req.result;
+        if (img) {
+          img.folderId = folderId;
+          await dbPut('images', img);
+        }
+        resolve();
+      };
+    });
+  }
+  const fname = folderId === '__unsorted__' ? '未分類' : 
+                (folders.find(f => f.id === folderId)?.name || '');
+  toast(`${selectedIds.size}件を「${fname}」に移動`);
+  closeModal('moveFolderModal');
+  exitSelectMode();
+  await loadFolders();
+  await loadImages();
+}
+
+// ===== FILE IMPORT =====
+async function handleFileImport(e) {
+  const files = Array.from(e.target.files);
+  if (!files.length) return;
+  let count = 0;
+  for (const file of files) {
+    if (!file.type.startsWith('image/')) continue;
+    const data = await readFileAsDataURL(file);
+    const thumbnail = await createThumbnail(data, 300);
+    const folderId = (currentFolderId === '__all__') ? '__unsorted__' : currentFolderId;
+    await dbPut('images', {
+      id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+      name: file.name,
+      folderId,
+      data,
+      thumbnail,
+      addedAt: Date.now(),
+      size: file.size
+    });
+    count++;
+  }
+  e.target.value = '';
+  toast(`${count}枚を追加しました`);
+  await loadFolders();
+  await loadImages();
+}
+
+function readFileAsDataURL(file) {
+  return new Promise((resolve) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.readAsDataURL(file);
+  });
+}
+
+function createThumbnail(dataUrl, maxSize) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let w = img.width, h = img.height;
+      if (w > h) { h = (maxSize * h) / w; w = maxSize; }
+      else { w = (maxSize * w) / h; h = maxSize; }
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.src = dataUrl;
+  });
+}
+
+// ===== DRAG & DROP =====
+function setupDragDrop() {
+  const overlay = document.getElementById('dropOverlay');
+
+  document.addEventListener('dragenter', (e) => {
+    e.preventDefault();
+    overlay.classList.add('active');
+  });
+
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+
+    // Highlight folder items as drop targets
+    document.querySelectorAll('.folder-item').forEach(el => {
+      const rect = el.getBoundingClientRect();
+      const over = e.clientX >= rect.left && e.clientX <= rect.right &&
+                   e.clientY >= rect.top && e.clientY <= rect.bottom;
+      el.classList.toggle('drop-target', over);
+    });
+  });
+
+  document.addEventListener('dragleave', (e) => {
+    if (e.relatedTarget === null || !document.contains(e.relatedTarget)) {
+      overlay.classList.remove('active');
+      document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+    }
+  });
+
+  document.addEventListener('drop', async (e) => {
+    e.preventDefault();
+    overlay.classList.remove('active');
+
+    // Find drop target folder
+    let targetFolderId = currentFolderId === '__all__' ? '__unsorted__' : currentFolderId;
+    const dropTarget = document.querySelector('.folder-item.drop-target');
+    if (dropTarget) {
+      targetFolderId = dropTarget.dataset.folderId;
+      if (targetFolderId === '__all__') targetFolderId = '__unsorted__';
+    }
+    document.querySelectorAll('.drop-target').forEach(el => el.classList.remove('drop-target'));
+
+    const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+    if (!files.length) return;
+
+    let count = 0;
+    for (const file of files) {
+      const data = await readFileAsDataURL(file);
+      const thumbnail = await createThumbnail(data, 300);
+      await dbPut('images', {
+        id: 'img_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+        name: file.name,
+        folderId: targetFolderId,
+        data,
+        thumbnail,
+        addedAt: Date.now(),
+        size: file.size
+      });
+      count++;
+    }
+    toast(`${count}枚を追加しました`);
+    await loadFolders();
+    await loadImages();
+  });
+}
+
+// ===== VIEWER =====
+function openViewer(index) {
+  viewerImages = [...currentImages];
+  viewerIndex = index;
+  showViewerImage();
+  document.getElementById('viewer').classList.add('active');
+  document.getElementById('viewer').classList.add('show-info');
+  setTimeout(() => {
+    document.getElementById('viewer').classList.remove('show-info');
+  }, 2000);
+  swipeUpCount = 0;
+}
+
+function closeViewer() {
+  document.getElementById('viewer').classList.remove('active');
+  viewerIndex = -1;
+}
+
+function showViewerImage() {
+  if (viewerIndex < 0 || viewerIndex >= viewerImages.length) return;
+  const img = viewerImages[viewerIndex];
+  const el = document.getElementById('viewerImg');
+  el.style.opacity = '0';
+  el.src = img.data;
+  el.onload = () => { el.style.opacity = '1'; };
+  document.getElementById('viewerFilename').textContent = img.name;
+  document.getElementById('viewerCounter').textContent = `${viewerIndex + 1} / ${viewerImages.length}`;
+}
+
+function viewerNext() {
+  if (viewerIndex < viewerImages.length - 1) {
+    viewerIndex++;
+    const el = document.getElementById('viewerImg');
+    el.style.transform = 'translateX(-30px)';
+    el.style.opacity = '0';
+    setTimeout(() => {
+      showViewerImage();
+      el.style.transform = 'translateX(30px)';
+      requestAnimationFrame(() => {
+        el.style.transform = 'translateX(0)';
+        el.style.opacity = '1';
+      });
+    }, 100);
+  }
+}
+
+function viewerPrev() {
+  if (viewerIndex > 0) {
+    viewerIndex--;
+    const el = document.getElementById('viewerImg');
+    el.style.transform = 'translateX(30px)';
+    el.style.opacity = '0';
+    setTimeout(() => {
+      showViewerImage();
+      el.style.transform = 'translateX(-30px)';
+      requestAnimationFrame(() => {
+        el.style.transform = 'translateX(0)';
+        el.style.opacity = '1';
+      });
+    }, 100);
+  }
+}
+
+// Viewer touch gestures
+(function() {
+  const viewer = document.getElementById('viewer');
+  let startX, startY, moved;
+
+  viewer.addEventListener('touchstart', (e) => {
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    moved = false;
+  }, { passive: true });
+
+  viewer.addEventListener('touchmove', (e) => {
+    moved = true;
+  }, { passive: true });
+
+  viewer.addEventListener('touchend', (e) => {
+    if (!moved) {
+      // Tap - show info briefly
+      viewer.classList.add('show-info');
+      setTimeout(() => viewer.classList.remove('show-info'), 2000);
+      return;
+    }
+
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const absDx = Math.abs(dx);
+    const absDy = Math.abs(dy);
+
+    if (absDx > absDy && absDx > 50) {
+      // Horizontal swipe
+      swipeUpCount = 0;
+      if (dx < 0) viewerNext();
+      else viewerPrev();
+    } else if (absDy > absDx && dy < -50) {
+      // Swipe up
+      swipeUpCount++;
+      clearTimeout(swipeUpTimer);
+      swipeUpTimer = setTimeout(() => { swipeUpCount = 0; }, 800);
+      if (swipeUpCount >= 2) {
+        swipeUpCount = 0;
+        closeViewer();
+      }
+    } else {
+      swipeUpCount = 0;
+    }
+  }, { passive: true });
+})();
+
+// ===== GRID SIZE =====
+function setGridSize(size) {
+  gridSize = size;
+  document.getElementById('imageGrid').dataset.size = size;
+  document.querySelectorAll('.size-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.size === size);
+  });
+}
+
+// ===== MODAL =====
+function closeModal(id) {
+  document.getElementById(id).classList.remove('active');
+}
+
+// Close modals on overlay click
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', (e) => {
+    if (e.target === el) el.classList.remove('active');
+  });
+});
+
+// Enter key for modals
+document.getElementById('newFolderInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') createFolder();
+});
+document.getElementById('renameFolderInput').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') renameFolder();
+});
+
+// ===== TOAST =====
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ===== UTILS =====
+function escHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+// Keyboard shortcuts (for testing on desktop)
+document.addEventListener('keydown', (e) => {
+  if (document.getElementById('viewer').classList.contains('active')) {
+    if (e.key === 'ArrowRight') viewerNext();
+    else if (e.key === 'ArrowLeft') viewerPrev();
+    else if (e.key === 'Escape') closeViewer();
+  }
+});
+
+// ===== START =====
+init();
+</script>
+</body>
+</html>
